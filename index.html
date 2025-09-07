@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Serial Monitor & Plotter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #e5e7eb; /* gray-200 */
+        }
+        .terminal {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            background-color: #111827; /* gray-900 */
+            color: #d1d5db; /* gray-300 */
+            height: 450px;
+            overflow-y: scroll;
+            border: 1px solid #374151; /* gray-700 */
+            padding: 1rem;
+            border-radius: 0.5rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .chart-container {
+            position: relative;
+            height: 450px;
+            background-color: #1f2937; /* gray-800 */
+            border-radius: 0.5rem;
+            padding: 1rem;
+        }
+        /* Custom scrollbar for terminal */
+        .terminal::-webkit-scrollbar {
+            width: 8px;
+        }
+        .terminal::-webkit-scrollbar-track {
+            background: #1f2937; /* gray-800 */
+        }
+        .terminal::-webkit-scrollbar-thumb {
+            background: #4b5563; /* gray-600 */
+            border-radius: 4px;
+        }
+        .terminal::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* gray-500 */
+        }
+        .btn {
+            @apply px-4 py-2 rounded-md font-semibold text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 transition-colors duration-200;
+        }
+        .btn-primary {
+            @apply bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500;
+        }
+        .btn-secondary {
+            @apply bg-gray-600 hover:bg-gray-700 focus:ring-gray-500;
+        }
+        .btn-danger {
+            @apply bg-red-600 hover:bg-red-700 focus:ring-red-500;
+        }
+        select, input[type="number"], input[type="text"] {
+            @apply bg-gray-700 border border-gray-600 text-white rounded-md p-2;
+        }
+        .input-group {
+             @apply bg-gray-700 border border-gray-600 text-white rounded-md;
+        }
+        .status-dot {
+            @apply inline-block w-3 h-3 rounded-full mr-2;
+        }
+        .status-disconnected {
+            @apply bg-red-500;
+        }
+        .status-connected {
+            @apply bg-green-500;
+        }
+        .control-group {
+            @apply bg-gray-800 p-4 rounded-lg shadow-lg flex flex-col space-y-3;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 h-full p-4 md:p-8">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+            <h1 class="text-3xl font-bold text-white">Web Serial Monitor & Plotter</h1>
+            <div id="status" class="flex items-center text-lg">
+                <span id="status-dot" class="status-dot status-disconnected"></span>
+                <span id="status-text">Disconnected</span>
+            </div>
+        </header>
+
+        <!-- Notifications -->
+        <div id="notification-area" class="hidden bg-red-800 border border-red-600 text-white px-4 py-3 rounded-lg relative" role="alert">
+            <strong class="font-bold">Error: </strong>
+            <span class="block sm:inline" id="notification-message"></span>
+        </div>
+        
+        <!-- Controls -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Connection & Terminal -->
+            <div class="control-group">
+                <h3 class="font-bold text-lg border-b border-gray-600 pb-2">Connection</h3>
+                <button id="connectButton" class="btn btn-primary w-full">Connect</button>
+                <select id="baudRate" class="w-full">
+                    <option value="9600">9600</option>
+                    <option value="19200">19200</option>
+                    <option value="38400">38400</option>
+                    <option value="57600">57600</option>
+                    <option value="115200" selected>115200</option>
+                </select>
+                <h3 class="font-bold text-lg border-b border-gray-600 pb-2 pt-2">Terminal</h3>
+                <div class="input-group p-2 flex justify-between">
+                     <label><input type="radio" name="format" value="text" checked> ANSI</label>
+                     <label><input type="radio" name="format" value="raw"> Raw</label>
+                     <label><input type="radio" name="format" value="hex"> Hex</label>
+                </div>
+                <button id="clearLogButton" class="btn btn-secondary w-full">Clear Terminal</button>
+            </div>
+            
+            <!-- Plotter Format -->
+            <div class="control-group">
+                <h3 class="font-bold text-lg border-b border-gray-600 pb-2">Plotter Format</h3>
+                 <div class="input-group p-2 flex flex-col space-y-2">
+                     <label><input type="radio" name="plotterFormat" value="off" checked> Off</label>
+                     <label><input type="radio" name="plotterFormat" value="raw"> Raw (Text or Binary)</label>
+                     <label><input type="radio" name="plotterFormat" value="csv"> CSV (Text)</label>
+                     <label><input type="radio" name="plotterFormat" value="json"> JSON (Text)</label>
+                </div>
+                 <div id="raw-options" class="hidden space-y-2 pt-2">
+                    <label for="rawDataType" class="font-semibold">Data Type (Raw)</label>
+                    <select id="rawDataType" class="w-full">
+                        <option value="ascii">ASCII (newline delimited)</option>
+                        <option value="uint8">Unsigned 8-bit Int</option>
+                        <option value="int8">Signed 8-bit Int</option>
+                        <option value="uint16">Unsigned 16-bit Int</option>
+                        <option value="int16">Signed 16-bit Int</option>
+                        <option value="uint32">Unsigned 32-bit Int</option>
+                        <option value="int32">Signed 32-bit Int</option>
+                        <option value="float32">Float 32-bit</option>
+                        <option value="float64">Float 64-bit (Double)</option>
+                    </select>
+                     <div id="endian-options" class="hidden space-y-2">
+                        <label for="endianType" class="font-semibold">Endianness</label>
+                        <select id="endianType" class="w-full">
+                            <option value="little">Little Endian</option>
+                            <option value="big">Big Endian</option>
+                        </select>
+                    </div>
+                 </div>
+                 <div id="json-options" class="hidden space-y-2 pt-2">
+                     <label for="jsonKey" class="font-semibold">JSON Key (optional)</label>
+                     <input type="text" id="jsonKey" placeholder="e.g., data.temperature" class="w-full">
+                 </div>
+            </div>
+
+            <!-- Plotter Control -->
+             <div class="control-group">
+                 <h3 class="font-bold text-lg border-b border-gray-600 pb-2">Plotter Control</h3>
+                 <label for="maxPoints" class="font-semibold">Visible Points</label>
+                 <input type="number" id="maxPoints" value="100" min="10" max="1000" class="w-full">
+                 <h4 class="font-semibold pt-2">Y-Axis Scale</h4>
+                 <div class="input-group p-2 flex justify-around">
+                      <label><input type="radio" name="yScale" value="auto" checked> Auto</label>
+                      <label><input type="radio" name="yScale" value="manual"> Manual</label>
+                 </div>
+                 <div id="manual-scale-options" class="hidden flex space-x-2">
+                     <input type="number" id="minY" placeholder="Min" class="w-1/2">
+                     <input type="number" id="maxY" placeholder="Max" class="w-1/2">
+                 </div>
+                 <button id="clearChartButton" class="btn btn-secondary w-full mt-auto">Clear Plotter</button>
+            </div>
+            
+             <!-- Filler for grid -->
+            <div class="hidden lg:block"></div>
+        </div>
+        
+        <!-- Main Content: Terminal and Plotter -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+                <h2 class="text-xl font-semibold mb-2">Terminal</h2>
+                <div id="terminal" class="terminal"></div>
+            </div>
+            <div>
+                <h2 class="text-xl font-semibold mb-2">Real-Time Plotter</h2>
+                <div class="chart-container">
+                    <canvas id="plotterChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Element Refs ---
+            const connectButton = document.getElementById('connectButton');
+            const baudRateSelect = document.getElementById('baudRate');
+            const terminal = document.getElementById('terminal');
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+            const notificationArea = document.getElementById('notification-area');
+            const notificationMessage = document.getElementById('notification-message');
+            const formatRadios = document.querySelectorAll('input[name="format"]');
+            const clearLogButton = document.getElementById('clearLogButton');
+            
+            // Plotter Elements
+            const plotterFormatRadios = document.querySelectorAll('input[name="plotterFormat"]');
+            const clearChartButton = document.getElementById('clearChartButton');
+            const maxPointsInput = document.getElementById('maxPoints');
+            const rawOptions = document.getElementById('raw-options');
+            const rawDataTypeSelect = document.getElementById('rawDataType');
+            const endianOptions = document.getElementById('endian-options');
+            const endianTypeSelect = document.getElementById('endianType');
+            const jsonOptions = document.getElementById('json-options');
+            const jsonKeyInput = document.getElementById('jsonKey');
+            const yScaleRadios = document.querySelectorAll('input[name="yScale"]');
+            const manualScaleOptions = document.getElementById('manual-scale-options');
+            const minYInput = document.getElementById('minY');
+            const maxYInput = document.getElementById('maxY');
+
+            // --- State ---
+            let port;
+            let reader;
+            let terminalDataBuffer = [];
+            let textLineBuffer = '';
+            let binaryBuffer = new Uint8Array(0);
+            let chart;
+            const textDecoder = new TextDecoder();
+            const chartColors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6'];
+            
+            // --- Util Functions ---
+            const showNotification = (message) => {
+                notificationMessage.textContent = message;
+                notificationArea.classList.remove('hidden');
+            };
+
+            if (!('serial' in navigator)) {
+                showNotification('Web Serial API is not supported in this browser. Please use a desktop version of Chrome, Edge, or Opera.');
+                connectButton.disabled = true;
+            }
+
+            // --- Chart Logic ---
+            const initChart = () => {
+                const ctx = document.getElementById('plotterChart').getContext('2d');
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: [], datasets: [] },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 0 },
+                        scales: {
+                            x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
+                            y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+                        },
+                        plugins: { legend: { labels: { color: '#d1d5db' } } }
+                    }
+                });
+            };
+
+            const clearChart = () => {
+                if(chart) {
+                    chart.data.labels = [];
+                    chart.data.datasets = [];
+                    chart.update();
+                }
+            };
+            
+            const updateChartScales = () => {
+                 const scaleMode = document.querySelector('input[name="yScale"]:checked').value;
+                 if (scaleMode === 'auto') {
+                     delete chart.options.scales.y.min;
+                     delete chart.options.scales.y.max;
+                 } else {
+                     const min = parseFloat(minYInput.value);
+                     const max = parseFloat(maxYInput.value);
+                     if (!isNaN(min)) chart.options.scales.y.min = min;
+                     if (!isNaN(max)) chart.options.scales.y.max = max;
+                 }
+                 chart.update('none');
+            };
+
+            // --- UI and State Management ---
+            const updateUIState = (connected) => {
+                connectButton.textContent = connected ? 'Disconnect' : 'Connect';
+                connectButton.classList.toggle('btn-primary', !connected);
+                connectButton.classList.toggle('btn-danger', connected);
+                statusDot.classList.toggle('status-disconnected', !connected);
+                statusDot.classList.toggle('status-connected', connected);
+                statusText.textContent = connected ? 'Connected' : 'Disconnected';
+                baudRateSelect.disabled = connected;
+            };
+
+            const updatePlotterControls = () => {
+                const format = document.querySelector('input[name="plotterFormat"]:checked').value;
+                rawOptions.classList.toggle('hidden', format !== 'raw');
+                jsonOptions.classList.toggle('hidden', format !== 'json');
+            };
+            
+            const updateEndianControls = () => {
+                const type = rawDataTypeSelect.value;
+                const bytes = getBytesForType(type);
+                endianOptions.classList.toggle('hidden', bytes <= 1);
+            };
+
+            // --- Serial Connection Logic ---
+            const connect = async () => {
+                try {
+                    port = await navigator.serial.requestPort();
+                    await port.open({ baudRate: parseInt(baudRateSelect.value, 10) });
+                    
+                    notificationArea.classList.add('hidden');
+                    updateUIState(true);
+                    
+                    while (port.readable) {
+                        reader = port.readable.getReader();
+                        try {
+                            while (true) {
+                                const { value, done } = await reader.read();
+                                if (done) break;
+                                handleIncomingData(value);
+                            }
+                        } catch (error) {
+                           console.error('Read error:', error);
+                        } finally {
+                            reader.releaseLock();
+                        }
+                    }
+
+                } catch (error) {
+                    if (error.name !== 'NotFoundError') {
+                         showNotification('Connection error: ' + error.message);
+                    }
+                    updateUIState(false);
+                }
+            };
+
+            const disconnect = async () => {
+                if (reader) await reader.cancel();
+                if (port) await port.close();
+                port = null;
+                reader = null;
+                updateUIState(false);
+            };
+
+            // --- Data Handling ---
+            const handleIncomingData = (data) => { // data is a Uint8Array
+                const textChunk = textDecoder.decode(data, {stream: true});
+                terminalDataBuffer.push(textChunk);
+                appendDataToTerminal(textChunk);
+                
+                const plotterFormat = document.querySelector('input[name="plotterFormat"]:checked').value;
+                
+                if (plotterFormat === 'raw' && rawDataTypeSelect.value !== 'ascii') {
+                    const newBuffer = new Uint8Array(binaryBuffer.length + data.length);
+                    newBuffer.set(binaryBuffer);
+                    newBuffer.set(data, binaryBuffer.length);
+                    binaryBuffer = newBuffer;
+                    processBinaryBuffer();
+                } else {
+                    textLineBuffer += textChunk;
+                    let lines = textLineBuffer.split(/\r?\n/);
+                    textLineBuffer = lines.pop();
+                    lines.forEach(line => { if (line.trim()) updatePlotter(line.trim()); });
+                }
+            };
+            
+            // --- Terminal Rendering ---
+            const appendDataToTerminal = (data) => {
+                const format = document.querySelector('input[name="format"]:checked').value;
+                const wasScrolledToBottom = terminal.scrollHeight - terminal.clientHeight <= terminal.scrollTop + 1;
+
+                switch (format) {
+                    case 'hex': terminal.appendChild(document.createTextNode(stringToHex(data) + ' ')); break;
+                    case 'text': terminal.insertAdjacentHTML('beforeend', ansiToHtml(data)); break;
+                    case 'raw': terminal.appendChild(document.createTextNode(data)); break;
+                }
+
+                if (wasScrolledToBottom) terminal.scrollTop = terminal.scrollHeight;
+            };
+
+            const rerenderTerminal = () => {
+                const format = document.querySelector('input[name="format"]:checked').value;
+                terminal.innerHTML = '';
+                const fullText = terminalDataBuffer.join('');
+                appendDataToTerminal(fullText);
+                terminal.scrollTop = terminal.scrollHeight;
+            };
+            
+            const stringToHex = (s) => Array.from(new TextEncoder().encode(s)).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+            const ansiToHtml = (text) => {
+                const sanitized = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return sanitized.replace(/\u001b\[(\d+(?:;\d+)*)?m/g, (match, code) => {
+                    if (!code || code === '0') return '</span>';
+                    const codes = code.split(';');
+                    const styles = codes.map(c => getStyleForCode(parseInt(c,10))).filter(Boolean).join(';');
+                    return `<span style="${styles}">`;
+                });
+            };
+             const getStyleForCode = (code) => {
+                const colors = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'];
+                if (code >= 30 && code <= 37) return `color: ${colors[code - 30]}`;
+                if (code >= 40 && code <= 47) return `background-color: ${colors[code - 40]}`;
+                if (code === 1) return 'font-weight: bold';
+                return null;
+            };
+
+            // --- Plotter Logic ---
+            const processBinaryBuffer = () => {
+                const type = rawDataTypeSelect.value;
+                const bytes = getBytesForType(type);
+                if (bytes === 0) return; // ASCII handled elsewhere
+                
+                const isLittleEndian = endianTypeSelect.value === 'little';
+                const view = new DataView(binaryBuffer.buffer);
+
+                let offset = 0;
+                while(binaryBuffer.length - offset >= bytes) {
+                    let value;
+                    switch(type) {
+                        case 'uint8': value = view.getUint8(offset); break;
+                        case 'int8': value = view.getInt8(offset); break;
+                        case 'uint16': value = view.getUint16(offset, isLittleEndian); break;
+                        case 'int16': value = view.getInt16(offset, isLittleEndian); break;
+                        case 'uint32': value = view.getUint32(offset, isLittleEndian); break;
+                        case 'int32': value = view.getInt32(offset, isLittleEndian); break;
+                        case 'float32': value = view.getFloat32(offset, isLittleEndian); break;
+                        case 'float64': value = view.getFloat64(offset, isLittleEndian); break;
+                    }
+                    updatePlotterWithValues([value]);
+                    offset += bytes;
+                }
+                if (offset > 0) {
+                    binaryBuffer = binaryBuffer.slice(offset);
+                }
+            };
+            
+            const getBytesForType = (type) => {
+                switch(type) {
+                    case 'uint8': case 'int8': return 1;
+                    case 'uint16': case 'int16': return 2;
+                    case 'uint32': case 'int32': case 'float32': return 4;
+                    case 'float64': return 8;
+                    default: return 0; // ASCII
+                }
+            };
+
+            const updatePlotter = (line) => {
+                const format = document.querySelector('input[name="plotterFormat"]:checked').value;
+                if (format === 'off') return;
+                
+                let values = [];
+                try {
+                    switch (format) {
+                        case 'raw': // This now only handles ASCII raw
+                            if(rawDataTypeSelect.value === 'ascii') {
+                                const val = parseFloat(line);
+                                if (!isNaN(val)) values.push(val);
+                            }
+                            break;
+                        case 'csv':
+                            values = line.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
+                            break;
+                        case 'json':
+                            const obj = JSON.parse(line);
+                            const keyPath = jsonKeyInput.value.trim();
+                             if (keyPath) {
+                                let current = keyPath.split('.').reduce((o, k) => (o || {})[k], obj);
+                                if (typeof current === 'number') values.push(current);
+                            } else {
+                                Object.keys(obj).forEach(key => {
+                                    if (typeof obj[key] === 'number') {
+                                        if (!chart.data.datasets.some(ds => ds.label === key)) addDataset(key);
+                                        updateDataset(key, obj[key]);
+                                    }
+                                });
+                                chart.update('none');
+                                return;
+                            }
+                            break;
+                    }
+                    if (values.length > 0) updatePlotterWithValues(values);
+
+                } catch (e) { console.warn("Error parsing plotter data:", e); }
+            };
+
+            const updatePlotterWithValues = (values) => {
+                values.forEach((v, i) => {
+                    const label = `Value ${i + 1}`;
+                    if (!chart.data.datasets[i]) addDataset(label);
+                    updateDataset(i, v);
+                });
+                chart.update('none');
+            };
+
+            const addDataset = (label) => {
+                const colorIndex = chart.data.datasets.length % chartColors.length;
+                chart.data.datasets.push({
+                    label, data: [],
+                    borderColor: chartColors[colorIndex],
+                    borderWidth: 2, pointRadius: 0, tension: 0.3
+                });
+            };
+
+            const updateDataset = (indexOrLabel, value) => {
+                const datasetIndex = typeof indexOrLabel === 'number' ? indexOrLabel : chart.data.datasets.findIndex(ds => ds.label === indexOrLabel);
+                if(datasetIndex === -1) return;
+
+                const maxPoints = parseInt(maxPointsInput.value, 10);
+                if (datasetIndex === 0) {
+                    chart.data.labels.push(new Date().toLocaleTimeString());
+                     if (chart.data.labels.length > maxPoints) chart.data.labels.shift();
+                }
+
+                const dataArray = chart.data.datasets[datasetIndex].data;
+                dataArray.push(value);
+                if (dataArray.length > maxPoints) dataArray.shift();
+            };
+            
+            // --- Event Listeners ---
+            connectButton.addEventListener('click', () => port ? disconnect() : connect());
+            clearLogButton.addEventListener('click', () => { terminal.innerHTML = ''; terminalDataBuffer = []; });
+            clearChartButton.addEventListener('click', clearChart);
+            formatRadios.forEach(radio => radio.addEventListener('change', rerenderTerminal));
+            plotterFormatRadios.forEach(radio => radio.addEventListener('change', updatePlotterControls));
+            rawDataTypeSelect.addEventListener('change', updateEndianControls);
+            yScaleRadios.forEach(radio => radio.addEventListener('change', () => {
+                manualScaleOptions.classList.toggle('hidden', radio.value === 'auto');
+                updateChartScales();
+            }));
+            [minYInput, maxYInput].forEach(input => input.addEventListener('input', updateChartScales));
+
+            // --- Initial Setup ---
+            initChart();
+            updateUIState(false);
+            updatePlotterControls();
+            updateEndianControls();
+        });
+    </script>
+</body>
+</html>
+
