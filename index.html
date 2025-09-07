@@ -220,7 +220,7 @@
         
         <!-- Main Content: Terminal and Plotter -->
         <div id="mainContentGrid" class="flex w-full flex-grow min-h-0">
-            <div id="terminalColumn" class="min-w-0 flex flex-col">
+            <div id="terminalColumn" class="min-w-0 flex flex-col overflow-hidden">
                 <h2 class="text-xl font-semibold mb-2">Terminal</h2>
                 <div id="terminal" class="terminal flex-grow rounded-b-none"></div>
                 <!-- Send Controls -->
@@ -240,7 +240,7 @@
                 </div>
             </div>
             <div id="resizer" class="flex-shrink-0 w-2 cursor-col-resize bg-gray-600 hover:bg-indigo-500 rounded mx-2"></div>
-            <div id="plotterColumn" class="min-w-0 flex flex-col">
+            <div id="plotterColumn" class="min-w-0 flex flex-col overflow-hidden">
                 <h2 class="text-xl font-semibold mb-2">Real-Time Plotter</h2>
                 <div class="chart-container flex-grow">
                     <canvas id="plotterChart"></canvas>
