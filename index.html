@@ -107,6 +107,17 @@
                     <option value="57600">57600</option>
                     <option value="115200" selected>115200</option>
                 </select>
+                <h3 class="font-bold text-lg border-b border-gray-600 pb-2 pt-2">Line Control</h3>
+                <div class="input-group p-2 flex justify-around">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="dtrCheckbox" class="bg-gray-600 rounded">
+                        <span>DTR</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="rtsCheckbox" class="bg-gray-600 rounded">
+                        <span>RTS</span>
+                    </label>
+                </div>
                 <h3 class="font-bold text-lg border-b border-gray-600 pb-2 pt-2">Terminal</h3>
                 <div class="input-group p-2 flex justify-between">
                      <label><input type="radio" name="format" value="text" checked> ANSI</label>
@@ -200,6 +211,8 @@
             const notificationMessage = document.getElementById('notification-message');
             const formatRadios = document.querySelectorAll('input[name="format"]');
             const clearLogButton = document.getElementById('clearLogButton');
+            const dtrCheckbox = document.getElementById('dtrCheckbox');
+            const rtsCheckbox = document.getElementById('rtsCheckbox');
             
             // Plotter Elements
             const plotterFormatRadios = document.querySelectorAll('input[name="plotterFormat"]');
@@ -288,6 +301,12 @@
                 statusDot.classList.toggle('status-connected', connected);
                 statusText.textContent = connected ? 'Connected' : 'Disconnected';
                 baudRateSelect.disabled = connected;
+                dtrCheckbox.disabled = !connected;
+                rtsCheckbox.disabled = !connected;
+                if (!connected) {
+                    dtrCheckbox.checked = false;
+                    rtsCheckbox.checked = false;
+                }
             };
 
             const updatePlotterControls = () => {
@@ -303,6 +322,19 @@
             };
 
             // --- Serial Connection Logic ---
+            const setLineSignals = async () => {
+                if (!port) return;
+                try {
+                    await port.setSignals({
+                        dataTerminalReady: dtrCheckbox.checked,
+                        requestToSend: rtsCheckbox.checked,
+                    });
+                } catch (error) {
+                    showNotification(`Failed to set signals: ${error.message}`);
+                    console.error("Failed to set signals:", error);
+                }
+            };
+
             const connect = async () => {
                 try {
                     port = await navigator.serial.requestPort();
@@ -310,6 +342,7 @@
                     
                     notificationArea.classList.add('hidden');
                     updateUIState(true);
+                    await setLineSignals(); // Set initial DTR/RTS state on connect
                     
                     readLoopActive = true;
                     // Start reading from the port
@@ -540,6 +573,8 @@
             formatRadios.forEach(radio => radio.addEventListener('change', rerenderTerminal));
             plotterFormatRadios.forEach(radio => radio.addEventListener('change', updatePlotterControls));
             rawDataTypeSelect.addEventListener('change', updateEndianControls);
+            dtrCheckbox.addEventListener('change', setLineSignals);
+            rtsCheckbox.addEventListener('change', setLineSignals);
             yScaleRadios.forEach(radio => radio.addEventListener('change', () => {
                 manualScaleOptions.classList.toggle('hidden', radio.value === 'auto');
                 updateChartScales();
