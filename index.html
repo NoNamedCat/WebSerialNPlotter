@@ -219,6 +219,7 @@
             // --- State ---
             let port;
             let reader;
+            let readLoopActive = false;
             let terminalDataBuffer = [];
             let textLineBuffer = '';
             let binaryBuffer = new Uint8Array(0);
@@ -310,20 +311,35 @@
                     notificationArea.classList.add('hidden');
                     updateUIState(true);
                     
-                    while (port.readable) {
+                    readLoopActive = true;
+                    // Start reading from the port
+                    while (port.readable && readLoopActive) {
                         reader = port.readable.getReader();
                         try {
                             while (true) {
                                 const { value, done } = await reader.read();
-                                if (done) break;
+                                if (done) {
+                                    // reader.cancel() was called.
+                                    break;
+                                }
                                 handleIncomingData(value);
                             }
                         } catch (error) {
-                           console.error('Read error:', error);
+                            console.error('Read error:', error);
+                            // Break the loop if an error occurs (e.g., device unplugged).
+                            break; 
                         } finally {
                             reader.releaseLock();
                         }
                     }
+                    
+                    // When the loop finishes, close the port
+                    if (port) {
+                        await port.close();
+                    }
+                    port = null;
+                    reader = null;
+                    updateUIState(false);
 
                 } catch (error) {
                     if (error.name !== 'NotFoundError') {
@@ -334,11 +350,13 @@
             };
 
             const disconnect = async () => {
-                if (reader) await reader.cancel();
-                if (port) await port.close();
-                port = null;
-                reader = null;
-                updateUIState(false);
+                readLoopActive = false; // Signal the loop to stop
+                if (reader) {
+                    // This will either make `read()` return `done: true` or throw an error,
+                    // either way it will break the inner loop.
+                    await reader.cancel();
+                }
+                // The loop in `connect` will then terminate and handle closing the port.
             };
 
             // --- Data Handling ---
