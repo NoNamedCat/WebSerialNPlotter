@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Serial Monitor & Plotter</title>
+    <title>Web Serial Monitor & Plotter v2.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -222,25 +222,21 @@
         <div id="mainContentGrid" class="flex w-full flex-grow min-h-0">
             <div id="terminalColumn" class="min-w-0 flex flex-col overflow-hidden">
                 <h2 class="text-xl font-semibold mb-2 flex-shrink-0">Terminal</h2>
-                <div class="flex-grow min-h-0 flex flex-col">
-                    <div class="flex-grow min-h-0">
-                        <div id="terminal" class="terminal h-full w-full rounded-b-none"></div>
-                    </div>
-                    <!-- Send Controls -->
-                    <div class="flex items-center space-x-2 p-2 bg-gray-800 rounded-b-md flex-shrink-0">
-                        <textarea id="sendInput" class="flex-grow bg-gray-900 rounded-md p-2 h-10 resize-none" placeholder="Enter data to send..." rows="1"></textarea>
-                        <select id="sendFormat" class="bg-gray-700 border border-gray-600 text-white rounded-md p-2 flex-shrink-0">
-                            <option value="text">Text</option>
-                            <option value="hex">Hex</option>
-                        </select>
-                        <select id="lineEnding" class="bg-gray-700 border border-gray-600 text-white rounded-md p-2 flex-shrink-0">
-                            <option value="none">No line ending</option>
-                            <option value="lf">\n (LF)</option>
-                            <option value="cr">\r (CR)</option>
-                            <option value="crlf" selected>\r\n (CRLF)</option>
-                        </select>
-                        <button id="sendButton" class="btn btn-primary whitespace-nowrap flex-shrink-0">Send</button>
-                    </div>
+                <div id="terminal" class="terminal flex-grow rounded-b-none"></div>
+                <!-- Send Controls -->
+                <div class="flex items-center space-x-2 p-2 bg-gray-800 rounded-b-md flex-shrink-0">
+                    <textarea id="sendInput" class="flex-grow bg-gray-900 rounded-md p-2 h-10 resize-none" placeholder="Enter data to send..." rows="1"></textarea>
+                    <select id="sendFormat" class="bg-gray-700 border border-gray-600 text-white rounded-md p-2 flex-shrink-0">
+                        <option value="text">Text</option>
+                        <option value="hex">Hex</option>
+                    </select>
+                    <select id="lineEnding" class="bg-gray-700 border border-gray-600 text-white rounded-md p-2 flex-shrink-0">
+                        <option value="none">No line ending</option>
+                        <option value="lf">\n (LF)</option>
+                        <option value="cr">\r (CR)</option>
+                        <option value="crlf" selected>\r\n (CRLF)</option>
+                    </select>
+                    <button id="sendButton" class="btn btn-primary whitespace-nowrap flex-shrink-0">Send</button>
                 </div>
             </div>
             <div id="resizer" class="flex-shrink-0 w-2 cursor-col-resize bg-gray-600 hover:bg-indigo-500 rounded mx-2"></div>
