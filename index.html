@@ -223,7 +223,9 @@
             <div id="terminalColumn" class="min-w-0 flex flex-col overflow-hidden">
                 <h2 class="text-xl font-semibold mb-2 flex-shrink-0">Terminal</h2>
                 <div class="flex-grow min-h-0 flex flex-col">
-                    <div id="terminal" class="terminal flex-grow rounded-b-none"></div>
+                    <div class="flex-grow min-h-0">
+                        <div id="terminal" class="terminal h-full w-full rounded-b-none"></div>
+                    </div>
                     <!-- Send Controls -->
                     <div class="flex items-center space-x-2 p-2 bg-gray-800 rounded-b-md flex-shrink-0">
                         <textarea id="sendInput" class="flex-grow bg-gray-900 rounded-md p-2 h-10 resize-none" placeholder="Enter data to send..." rows="1"></textarea>
