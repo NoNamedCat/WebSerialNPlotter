@@ -693,16 +693,45 @@
                 let values = [];
                 try {
                     switch (format) {
-                        case 'raw': if(rawDataTypeSelect.value === 'ascii') { const val = parseFloat(line); if (!isNaN(val)) values.push(val); } break;
-                        case 'csv': values = line.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v)); break;
+                        case 'raw': 
+                            if(rawDataTypeSelect.value === 'ascii') { 
+                                const val = parseFloat(line); 
+                                if (!isNaN(val)) values.push(val); 
+                            } 
+                            break;
+                        case 'csv': 
+                            values = line.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v)); 
+                            break;
                         case 'json':
-                            const obj = JSON.parse(line); const keyPath = jsonKeyInput.value.trim();
-                             if (keyPath) { let current = keyPath.split('.').reduce((o, k) => (o || {})[k], obj); if (typeof current === 'number') values.push(current); } 
-                             else { Object.keys(obj).forEach(key => { if (typeof obj[key] === 'number') { if (!chart.data.datasets.some(ds => ds.label === key)) addDataset(key); updateDataset(key, obj[key]); } }); chart.update('none'); return; }
+                            // Extract the JSON part from the line
+                            const jsonStart = line.indexOf('{');
+                            const jsonEnd = line.lastIndexOf('}');
+                            if (jsonStart === -1 || jsonEnd === -1) break; 
+                            const jsonString = line.substring(jsonStart, jsonEnd + 1);
+                            
+                            const obj = JSON.parse(jsonString); 
+                            const keyPath = jsonKeyInput.value.trim();
+                             if (keyPath) { 
+                                 let current = keyPath.split('.').reduce((o, k) => (o || {})[k], obj);
+                                 if (current !== undefined) {
+                                     const numValue = parseFloat(current);
+                                     if (!isNaN(numValue)) values.push(numValue);
+                                 }
+                             } else { 
+                                 Object.keys(obj).forEach(key => { 
+                                     const numValue = parseFloat(obj[key]);
+                                     if (!isNaN(numValue)) { 
+                                         if (!chart.data.datasets.some(ds => ds.label === key)) addDataset(key); 
+                                         updateDataset(key, numValue); 
+                                     } 
+                                 }); 
+                                 chart.update('none'); 
+                                 return; 
+                             }
                             break;
                     }
                     if (values.length > 0) updatePlotterWithValues(values);
-                } catch (e) { console.warn("Error parsing plotter data:", e); }
+                } catch (e) { /* Silently ignore lines that don't contain valid JSON */ }
             };
             const updatePlotterWithValues = (values) => { values.forEach((v, i) => { const label = `Value ${i + 1}`; if (!chart.data.datasets[i]) addDataset(label); updateDataset(i, v); }); chart.update('none'); };
             const addDataset = (label) => { const colorIndex = chart.data.datasets.length % chartColors.length; chart.data.datasets.push({ label, data: [], borderColor: chartColors[colorIndex], borderWidth: 2, pointRadius: 0, tension: 0.3 }); };
